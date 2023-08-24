@@ -1,0 +1,65 @@
+# This is a general manifest template for running SQLite.
+
+loader.entrypoint = "file:{{ gramine.libos }}"
+libos.entrypoint = "/db-bench"
+
+loader.log_level = "{{ log_level }}"
+#loader.log_level = "trace"
+
+loader.argv = [ 
+    "db-bench", "-db", "rocksdb",
+    "-threads", "1",
+    "-L", "/load.spec",
+    "-w", "fieldlength", "1024",
+    "-w", "fieldcount",  "1",
+    "-w", "recordcount", "2000000",
+    "-W", "workloads/workloadc.spec",
+    "-w", "operationcount", "1000000"
+]
+
+#    "-P", "rocksdb.db",
+#-P $file_name
+#    "-W", "/workloadc.spec",
+#   "-w", "operationcount", "1000000"
+
+loader.env.LD_LIBRARY_PATH = "/lib:{{ arch_libdir }}"
+# Set HOME to suppress "warning: cannot find home directory; cannot read ~/.sqliterc"
+loader.env.HOME = "/"
+
+fs.mounts = [
+  { path = "/lib", uri = "file:{{ gramine.runtimedir() }}" },
+  { path = "{{ arch_libdir }}", uri = "file:{{ arch_libdir }}" },
+  { path = "/db-bench", uri = "file:db-bench" },
+  { path = "/load.spec", uri = "file:workloads/load.spec" },
+  { path = "/workloadc.spec", uri = "file:workloads/workloadc.spec" },
+  { type= "tmpfs", path = "/app", uri = "file:app/untrusted_memory" },
+  { type = "encrypted", path = "/testdir/", uri = "file:testdir/", key_name = "default" },
+  { type = "encrypted", path = "/rocksdb.db/", uri = "file:rocksdb.db/", key_name = "default" },
+  { path = "/testdir/", uri = "file:testdir/", key_name = "default" },
+]
+
+#fs.root.type = "[chroot|...]"
+#fs.root.uri  = "file:testdir"
+#fs.start_dir = "file:testdir/"
+
+# Unfortunately, non-SGX Gramine cannot use special keys such as "_sgx_mrenclave", so for this
+# example to work on both non-SGX and SGX versions we hardcode a dummy key. In SGX production case,
+# it is recommended to remove this insecure key and instead use "_sgx_mrenclave"/"_sgx_mrsigner".
+fs.insecure__keys.default = "ffeeddccbbaa99887766554433221100"
+
+sgx.debug = true
+sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
+sgx.enclave_size = "1024M"
+sgx.max_threads = 16
+
+sgx.trusted_files = [
+  "file:{{ gramine.libos }}",
+  "file:db-bench",
+  "file:rocksdb.db/",
+  "file:workloads/load.spec",
+  "file:workloads/workloadc.spec",
+  "file:{{ gramine.runtimedir() }}/",
+  "file:testdir/",
+  "file:{{ arch_libdir }}/",
+]
+
